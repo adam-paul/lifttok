@@ -313,12 +313,14 @@ export default function VideoRecorder({ onVideoUploaded }) {
               {recording ? 'Stop Recording' : 'Start Recording'}
             </Text>
           </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.button}
-            onPress={toggleCameraType}
-          >
-            <Text style={styles.buttonText}>Flip Camera</Text>
-          </TouchableOpacity>
+          {!recording && (
+            <TouchableOpacity
+              style={styles.button}
+              onPress={toggleCameraType}
+            >
+              <Text style={styles.buttonText}>Flip Camera</Text>
+            </TouchableOpacity>
+          )}
         </View>
       </CameraView>
       {uploading && (
