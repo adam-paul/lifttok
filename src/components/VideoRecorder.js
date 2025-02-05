@@ -6,6 +6,7 @@ import * as FileSystem from 'expo-file-system';
 import { storage, db } from '../../firebase';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import WireframeOverlay from './WireframeOverlay';
 
 export default function VideoRecorder({ onVideoUploaded }) {
@@ -304,23 +305,21 @@ export default function VideoRecorder({ onVideoUploaded }) {
         videoStabilizationMode="auto"
       >
         <WireframeOverlay />
+        {!recording && (
+          <TouchableOpacity
+            style={styles.flipButton}
+            onPress={toggleCameraType}
+          >
+            <MaterialCommunityIcons name="camera-flip-outline" size={30} color="#fff" />
+          </TouchableOpacity>
+        )}
         <View style={styles.buttonContainer}>
           <TouchableOpacity
-            style={styles.button}
+            style={[styles.recordButton, recording && styles.recordingButton]}
             onPress={recording ? stopRecording : startRecording}
           >
-            <Text style={styles.buttonText}>
-              {recording ? 'Stop Recording' : 'Start Recording'}
-            </Text>
+            <View style={[styles.recordButtonInner, recording && styles.recordingButtonInner]} />
           </TouchableOpacity>
-          {!recording && (
-            <TouchableOpacity
-              style={styles.button}
-              onPress={toggleCameraType}
-            >
-              <Text style={styles.buttonText}>Flip Camera</Text>
-            </TouchableOpacity>
-          )}
         </View>
       </CameraView>
       {uploading && (
@@ -349,18 +348,42 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 20,
   },
-  button: {
-    backgroundColor: 'red',
-    padding: 20,
-    borderRadius: 50,
-    marginHorizontal: 20,
+  recordButton: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: '#fff',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 4,
+    borderColor: '#ff4040',
   },
-  buttonText: {
-    color: '#fff',
-    fontWeight: 'bold',
-    fontSize: 16,
+  recordButtonInner: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: '#ff4040',
+  },
+  recordingButton: {
+    borderColor: '#ff4040',
+  },
+  recordingButtonInner: {
+    width: 32,
+    height: 32,
+    borderRadius: 6,
+    backgroundColor: '#ff4040',
+  },
+  flipButton: {
+    position: 'absolute',
+    top: 20,
+    right: 20,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   uploadingOverlay: {
     ...StyleSheet.absoluteFillObject,
