@@ -2,3 +2,7 @@
 **/dist
 
 .expo/
+.idea/
+
+android/
+ios/

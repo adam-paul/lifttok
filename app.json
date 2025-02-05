@@ -8,8 +8,36 @@
       "android",
       "web"
     ],
+    "orientation": "portrait",
+    "newArchEnabled": true,
+    "plugins": [
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow LiftTok to access your camera to record workout videos.",
+          "microphonePermission": "Allow LiftTok to access your microphone for recording video audio."
+        }
+      ]
+    ],
     "assetBundlePatterns": [
       "**/*"
-    ]
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSCameraUsageDescription": "LiftTok needs access to your camera to record workout videos.",
+        "NSMicrophoneUsageDescription": "LiftTok needs access to your microphone to record audio in workout videos."
+      },
+      "bundleIdentifier": "com.anonymous.lifttok"
+    },
+    "android": {
+      "permissions": [
+        "CAMERA",
+        "RECORD_AUDIO",
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO"
+      ],
+      "package": "com.anonymous.lifttok"
+    }
   }
 }
