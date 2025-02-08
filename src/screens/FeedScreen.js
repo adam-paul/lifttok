@@ -1,6 +1,7 @@
 // src/screens/FeedScreen.js
 import React, { useEffect, useState } from 'react';
 import { View, FlatList, StyleSheet, ActivityIndicator, RefreshControl, Text } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import VideoItem from '../components/VideoItem';
 import { db, storage } from '../../firebase';
 import { collection, getDocs } from 'firebase/firestore';
@@ -10,6 +11,18 @@ export default function FeedScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [activeVideoId, setActiveVideoId] = useState(null);
+
+  // Stop video playback when screen loses focus
+  useFocusEffect(
+    React.useCallback(() => {
+      // When screen comes into focus, no need to do anything
+      return () => {
+        // When screen loses focus, stop any playing video
+        setActiveVideoId(null);
+      };
+    }, [])
+  );
 
   // Fetch videos from Firestore and get their download URLs
   const fetchVideos = async () => {
@@ -30,11 +43,22 @@ export default function FeedScreen() {
         console.log('Document ID:', doc.id);
         console.log('Document data:', JSON.stringify(data, null, 2));
         
-        // Add video regardless of timestamp
+        // Get timestamp from either createdAt (new format) or extract from filename
+        let timestamp;
+        if (data.createdAt) {
+          timestamp = data.createdAt;
+        } else if (data.filename) {
+          // Extract timestamp from filename (video_TIMESTAMP.mp4)
+          const match = data.filename.match(/video_(\d+)\.mp4/);
+          timestamp = match ? parseInt(match[1]) : 0;
+        } else {
+          timestamp = 0; // Fallback for videos without timestamp
+        }
+        
         videosData.push({
           id: doc.id,
           videoUrl: data.videoUrl,
-          timestamp: data.timestamp ? new Date(data.timestamp) : new Date(),
+          timestamp: timestamp,
           description: data.description || 'No description',
           userId: data.userId || 'anonymous',
         });
@@ -46,7 +70,10 @@ export default function FeedScreen() {
         console.log('No videos found in Firestore');
       }
       
-      setVideos(videosData);
+      // Sort videos by timestamp in descending order (most recent first)
+      const sortedVideos = videosData.sort((a, b) => b.timestamp - a.timestamp);
+      
+      setVideos(sortedVideos);
       setError(null);
     } catch (error) {
       console.error("Error fetching videos: ", error);
@@ -70,6 +97,16 @@ export default function FeedScreen() {
   useEffect(() => {
     fetchVideos();
   }, []);
+
+  const handleVideoPress = (videoId) => {
+    // If this video is already playing, pause it
+    if (activeVideoId === videoId) {
+      setActiveVideoId(null);
+    } else {
+      // Otherwise, play this video (which will automatically pause any other)
+      setActiveVideoId(videoId);
+    }
+  };
 
   if (loading && !refreshing) {
     return (
@@ -106,6 +143,8 @@ export default function FeedScreen() {
               timestamp={item.timestamp}
               description={item.description}
               userId={item.userId}
+              isActive={item.id === activeVideoId}
+              onVideoPress={() => handleVideoPress(item.id)}
             />
           )}
           refreshControl={

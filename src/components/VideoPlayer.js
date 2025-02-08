@@ -1,35 +1,31 @@
 // src/components/VideoPlayer.js
 import React, { useRef, useEffect, useState } from 'react';
 import { StyleSheet, View, ActivityIndicator, Text, TouchableOpacity } from 'react-native';
-import { Video, ResizeMode, AVPlaybackStatus } from 'expo-av';
+import { Video, ResizeMode } from 'expo-av';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 
-export default function VideoPlayer({ uri }) {
+export default function VideoPlayer({ uri, isActive, onPress }) {
   const videoRef = useRef(null);
   const [status, setStatus] = useState({});
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    // Reset state when URI changes
-    setStatus({});
-    setError(null);
-
-    // Load the video when the component mounts or URI changes
-    loadVideo();
-
-    // Cleanup function to unload video when component unmounts
-    return () => {
-      if (videoRef.current) {
-        videoRef.current.unloadAsync();
+    // Control playback based on isActive prop
+    if (videoRef.current) {
+      if (isActive) {
+        videoRef.current.playAsync();
+      } else {
+        videoRef.current.pauseAsync();
       }
-    };
-  }, [uri]);
+    }
+  }, [isActive]);
 
   const loadVideo = async () => {
     try {
       if (videoRef.current) {
         await videoRef.current.loadAsync(
           { uri },
-          { shouldPlay: true, isLooping: true },
+          { shouldPlay: false, isLooping: true },
           false
         );
       }
@@ -38,6 +34,15 @@ export default function VideoPlayer({ uri }) {
       setError(err);
     }
   };
+
+  useEffect(() => {
+    loadVideo();
+    return () => {
+      if (videoRef.current) {
+        videoRef.current.unloadAsync();
+      }
+    };
+  }, [uri]);
 
   const handlePlaybackStatusUpdate = (status) => {
     setStatus(status);
@@ -61,13 +66,17 @@ export default function VideoPlayer({ uri }) {
   }
 
   return (
-    <View style={styles.container}>
+    <TouchableOpacity 
+      style={styles.container} 
+      onPress={onPress}
+      activeOpacity={0.9}
+    >
       <Video 
         ref={videoRef}
         source={{ uri }}
         style={styles.video}
         resizeMode={ResizeMode.COVER}
-        shouldPlay={true}
+        shouldPlay={false}
         isLooping={true}
         useNativeControls={false}
         onPlaybackStatusUpdate={handlePlaybackStatusUpdate}
@@ -87,6 +96,13 @@ export default function VideoPlayer({ uri }) {
         </View>
       )}
 
+      {/* Show play icon overlay when paused */}
+      {status.isLoaded && !isActive && (
+        <View style={[styles.overlay, styles.centered, { backgroundColor: 'rgba(0, 0, 0, 0.3)' }]}>
+          <MaterialCommunityIcons name="play-circle-outline" size={60} color="#fff" />
+        </View>
+      )}
+
       {/* Show error message with retry button if video fails to load */}
       {error && (
         <View style={[styles.overlay, styles.centered]}>
@@ -99,7 +115,7 @@ export default function VideoPlayer({ uri }) {
           </TouchableOpacity>
         </View>
       )}
-    </View>
+    </TouchableOpacity>
   );
 }
 

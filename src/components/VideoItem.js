@@ -3,7 +3,7 @@ import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import VideoPlayer from './VideoPlayer';
 
-export default function VideoItem({ videoUri, timestamp, description, userId }) {
+export default function VideoItem({ videoUri, timestamp, description, userId, isActive, onVideoPress }) {
   const formatTimestamp = (date) => {
     if (!date) return '';
     const now = new Date();
@@ -21,7 +21,11 @@ export default function VideoItem({ videoUri, timestamp, description, userId }) 
 
   return (
     <View style={styles.container}>
-      <VideoPlayer uri={videoUri} />
+      <VideoPlayer 
+        uri={videoUri} 
+        isActive={isActive}
+        onPress={onVideoPress}
+      />
       <View style={styles.metadata}>
         {description && (
           <Text style={styles.description}>{description}</Text>

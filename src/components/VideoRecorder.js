@@ -154,7 +154,8 @@ export default function VideoRecorder({ onVideoUploaded }) {
       
       const response = await fetch(fileUri);
       const blob = await response.blob();
-      const filename = `video_${Date.now()}.mp4`;
+      const timestamp = Date.now();
+      const filename = `video_${timestamp}.mp4`;
       const storageRef = ref(storage, `videos/${filename}`);
       
       // Upload to Storage
@@ -167,7 +168,7 @@ export default function VideoRecorder({ onVideoUploaded }) {
       const videoDoc = await addDoc(collection(db, 'videos'), {
         videoUrl: downloadURL,
         filename: filename,
-        timestamp: serverTimestamp(),
+        createdAt: timestamp,
         userId: 'anonymous', // Replace with actual user ID when auth is implemented
         description: 'Workout video', // Add proper description input later
       });
