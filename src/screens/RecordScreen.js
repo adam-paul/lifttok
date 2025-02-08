@@ -28,10 +28,15 @@ export default function RecordScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#000',
   },
   infoContainer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
     padding: 10,
-    backgroundColor: '#333',
+    backgroundColor: 'rgba(51, 51, 51, 0.8)',
   },
   infoText: {
     color: '#fff',

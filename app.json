@@ -12,26 +12,38 @@
     "newArchEnabled": true,
     "plugins": [
       [
-        "expo-camera",
+        "react-native-vision-camera",
         {
-          "cameraPermission": "Allow LiftTok to access your camera to record workout videos.",
-          "microphonePermission": "Allow LiftTok to access your microphone for recording video audio."
+          "cameraPermissionText": "Allow LiftTok to access your camera to record workout videos.",
+          "microphonePermissionText": "Allow LiftTok to access your microphone for recording video audio."
         }
-      ]
+      ], 
+      ["expo-dev-client", {
+        "debuggerHost": "localhost:8081"
+      }]
     ],
     "assetBundlePatterns": [
       "**/*"
     ],
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#000000"
+    },
     "ios": {
       "supportsTablet": true,
       "infoPlist": {
-        "NSCameraUsageDescription": "LiftTok needs access to your camera to record workout videos.",
+        "NSCameraUsageDescription": "Allow LiftTok to access your camera to record workout videos.",
         "NSMicrophoneUsageDescription": "LiftTok needs access to your microphone to record audio in workout videos.",
         "NSPhotoLibraryUsageDescription": "LiftTok needs access to your photo library to save workout videos."
       },
       "bundleIdentifier": "com.anonymous.lifttok"
     },
     "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#000000"
+      },
       "permissions": [
         "CAMERA",
         "RECORD_AUDIO",
@@ -41,6 +53,11 @@
         "android.permission.READ_EXTERNAL_STORAGE"
       ],
       "package": "com.anonymous.lifttok"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "b920ccd8-51ef-4d02-a944-0dd3b088c352"
+      }
     }
   }
 }

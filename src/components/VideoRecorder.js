@@ -1,7 +1,7 @@
 // src/components/VideoRecorder.js
 import React, { useState, useRef, useEffect } from 'react';
 import { View, TouchableOpacity, Text, StyleSheet, ActivityIndicator, Alert, Linking } from 'react-native';
-import { CameraView, useCameraPermissions, useMicrophonePermissions } from 'expo-camera';
+import { Camera, useCameraDevice, useCameraPermission, useMicrophonePermission } from 'react-native-vision-camera';
 import * as FileSystem from 'expo-file-system';
 import { storage, db } from '../../firebase';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
@@ -12,13 +12,12 @@ import WireframeOverlay from './WireframeOverlay';
 export default function VideoRecorder({ onVideoUploaded }) {
   const [recording, setRecording] = useState(false);
   const [uploading, setUploading] = useState(false);
-  const [facing, setFacing] = useState('back');
-  const [cameraPermission, requestCameraPermission] = useCameraPermissions();
-  const [microphonePermission, requestMicrophonePermission] = useMicrophonePermissions();
-  const cameraRef = useRef(null);
+  const {hasPermission: hasCameraPermission, requestPermission: requestCameraPermission} = useCameraPermission();
+  const {hasPermission: hasMicPermission, requestPermission: requestMicPermission} = useMicrophonePermission();
+  const [isFrontCamera, setIsFrontCamera] = useState(false);
+  const device = useCameraDevice(isFrontCamera ? 'front' : 'back');
+  const camera = useRef(null);
   const [isRecordingReady, setIsRecordingReady] = useState(false);
-  const recordingPromiseRef = useRef(null);
-  const recordingStartTimeRef = useRef(null);
   const [cameraStatus, setCameraStatus] = useState('initializing');
 
   useEffect(() => {
@@ -28,12 +27,10 @@ export default function VideoRecorder({ onVideoUploaded }) {
   const requestPermissions = async () => {
     console.log('Requesting permissions...');
     const cameraResult = await requestCameraPermission();
-    const micResult = await requestMicrophonePermission();
+    const micResult = await requestMicPermission();
     console.log('Permission results:', {
-      camera: cameraResult?.granted,
-      microphone: micResult?.granted,
-      cameraStatus: cameraResult?.status,
-      microphoneStatus: micResult?.status
+      camera: cameraResult,
+      microphone: micResult
     });
   };
 
@@ -47,7 +44,7 @@ export default function VideoRecorder({ onVideoUploaded }) {
     setIsRecordingReady(true);
   };
 
-  if (!cameraPermission || !microphonePermission) {
+  if (!hasCameraPermission || !hasMicPermission) {
     return (
       <View style={styles.container}>
         <ActivityIndicator size="large" color="#fff" />
@@ -56,7 +53,7 @@ export default function VideoRecorder({ onVideoUploaded }) {
     );
   }
 
-  if (!cameraPermission?.granted || !microphonePermission?.granted) {
+  if (!hasCameraPermission || !hasMicPermission) {
     return (
       <View style={styles.container}>
         <Text style={styles.permissionText}>
@@ -75,15 +72,15 @@ export default function VideoRecorder({ onVideoUploaded }) {
   const startRecording = async () => {
     try {
       console.log('Starting recording...', {
-        hasCameraRef: !!cameraRef.current,
+        hasCamera: !!camera.current,
         isRecording: recording,
         isReady: isRecordingReady,
         cameraStatus,
       });
 
-      if (!cameraRef.current || recording || !isRecordingReady) {
+      if (!camera.current || recording || !isRecordingReady) {
         console.warn('Cannot start recording:', { 
-          hasCameraRef: !!cameraRef.current, 
+          hasCamera: !!camera.current, 
           isRecording: recording, 
           isReady: isRecordingReady,
           cameraStatus
@@ -91,53 +88,25 @@ export default function VideoRecorder({ onVideoUploaded }) {
         return;
       }
 
-      // Ensure we're not in a bad state
-      if (recordingPromiseRef.current) {
-        console.log('Cleaning up previous recording promise');
-        recordingPromiseRef.current = null;
-      }
-
-      const videoFilePath = `${FileSystem.cacheDirectory}temp_video_${Date.now()}.mp4`;
-      console.log('Video will be saved to:', videoFilePath);
-      
-      // Ensure directory exists
-      const dirInfo = await FileSystem.getInfoAsync(FileSystem.cacheDirectory);
-      console.log('Cache directory status:', dirInfo);
-      
-      // Reset camera state before starting new recording
-      try {
-        await cameraRef.current.pausePreview();
-        await new Promise(resolve => setTimeout(resolve, 100));
-        await cameraRef.current.resumePreview();
-        console.log('Camera preview reset completed');
-      } catch (error) {
-        console.warn('Preview reset error (non-fatal):', error);
-      }
-
-      recordingStartTimeRef.current = Date.now();
-
-      // Start recording with simplified options
-      console.log('Initiating recordAsync...');
-      recordingPromiseRef.current = cameraRef.current.recordAsync({
-        quality: '720p',
-        maxDuration: 30,
-        mute: false,
-        // Remove custom Android settings that might be causing issues
-        // androidOutputFormat: 'MPEG_4',
-        // androidVideoEncoder: 'MPEG_4_SP',
-        // androidAudioEncoder: 'AAC',
-        // codec: 'mp4',
-        // fileFormat: 'mp4'
+      await camera.current.startRecording({
+        flash: 'off',
+        fileType: 'mp4',
+        onRecordingFinished: (video) => {
+          console.log('Recording finished:', video);
+          uploadVideo(video.path);
+        },
+        onRecordingError: (error) => {
+          console.error('Recording failed:', error);
+          Alert.alert(
+            'Recording Error',
+            'Failed to record video. Please try again.',
+            [{ text: 'OK' }]
+          );
+          setRecording(false);
+        },
       });
 
-      console.log('Record async initiated, setting recording state...');
       setRecording(true);
-      
-      // Add promise state logging
-      recordingPromiseRef.current.then(
-        result => console.log('Recording promise resolved:', result),
-        error => console.error('Recording promise rejected:', error)
-      );
 
     } catch (error) {
       console.error('Failed to start recording:', error);
@@ -147,83 +116,29 @@ export default function VideoRecorder({ onVideoUploaded }) {
         [{ text: 'OK' }]
       );
       setRecording(false);
-      recordingPromiseRef.current = null;
     }
   };
 
   const stopRecording = async () => {
-    console.log('Attempting to stop recording...', {
-      hasCameraRef: !!cameraRef.current,
-      isRecording: recording,
-      hasRecordingPromise: !!recordingPromiseRef.current,
-      recordingDuration: Date.now() - (recordingStartTimeRef.current || 0),
-      cameraStatus
-    });
-
-    if (!cameraRef.current || !recording || !recordingPromiseRef.current) {
+    if (!camera.current || !recording) {
       console.warn('Stop recording preconditions not met:', {
-        hasCameraRef: !!cameraRef.current,
-        isRecording: recording,
-        hasRecordingPromise: !!recordingPromiseRef.current
+        hasCamera: !!camera.current,
+        isRecording: recording
       });
       return;
     }
 
     try {
-      // Create a reference to the current recording promise
-      const currentRecordingPromise = recordingPromiseRef.current;
-      
-      // Clear refs before stopping to prevent any race conditions
-      recordingPromiseRef.current = null;
-      recordingStartTimeRef.current = null;
-      
-      console.log('Calling stopRecording on camera...');
-      await cameraRef.current.stopRecording();
-      console.log('stopRecording call completed');
-      
-      // Small delay to ensure camera has time to finish
-      await new Promise(resolve => setTimeout(resolve, 100));
-      
-      console.log('Waiting for recording promise to resolve...');
-      const result = await currentRecordingPromise;
-      console.log('Recording result:', result);
-
-      // Set recording state to false only after successful stop
+      console.log('Stopping recording...');
+      await camera.current.stopRecording();
       setRecording(false);
-
-      if (result?.uri) {
-        // Verify the file exists
-        const fileInfo = await FileSystem.getInfoAsync(result.uri);
-        console.log('Video file info:', fileInfo);
-        
-        if (fileInfo.exists && fileInfo.size > 0) {
-          console.log('Video recorded successfully:', {
-            uri: result.uri,
-            size: fileInfo.size,
-            modificationTime: fileInfo.modificationTime
-          });
-          await uploadVideo(result.uri);
-        } else {
-          throw new Error(`Video file invalid: ${JSON.stringify(fileInfo)}`);
-        }
-      } else {
-        throw new Error('No video URI was produced');
-      }
     } catch (error) {
-      console.error('Error in stop recording process:', error);
-      // Log the full error object
-      console.error('Detailed error:', {
-        message: error.message,
-        stack: error.stack,
-        name: error.name,
-        ...error
-      });
+      console.error('Error stopping recording:', error);
       Alert.alert(
         'Error',
         'Failed to stop recording. Please try again.',
         [{ text: 'OK' }]
       );
-    } finally {
       setRecording(false);
     }
   };
@@ -231,8 +146,13 @@ export default function VideoRecorder({ onVideoUploaded }) {
   const uploadVideo = async (uri) => {
     setUploading(true);
     try {
-      console.log('Starting video upload process...');
-      const response = await fetch(uri);
+      console.log('Starting video upload process with uri:', uri);
+      
+      // For react-native-vision-camera, we need to prefix the path with file://
+      const fileUri = uri.startsWith('file://') ? uri : `file://${uri}`;
+      console.log('Formatted file URI:', fileUri);
+      
+      const response = await fetch(fileUri);
       const blob = await response.blob();
       const filename = `video_${Date.now()}.mp4`;
       const storageRef = ref(storage, `videos/${filename}`);
@@ -260,7 +180,7 @@ export default function VideoRecorder({ onVideoUploaded }) {
 
       // Clean up the temporary file
       try {
-        await FileSystem.deleteAsync(uri, { idempotent: true });
+        await FileSystem.deleteAsync(fileUri, { idempotent: true });
       } catch (cleanupError) {
         console.error('Error cleaning up temporary file:', cleanupError);
       }
@@ -272,6 +192,11 @@ export default function VideoRecorder({ onVideoUploaded }) {
       );
     } catch (error) {
       console.error('Error uploading video:', error);
+      console.error('Error details:', {
+        code: error.code,
+        message: error.message,
+        stack: error.stack
+      });
       Alert.alert(
         'Upload Error',
         'Failed to upload video. Please try again.',
@@ -283,28 +208,26 @@ export default function VideoRecorder({ onVideoUploaded }) {
   };
 
   const toggleCameraType = () => {
-    setFacing(current => (current === 'back' ? 'front' : 'back'));
+    setIsFrontCamera(prev => !prev);
   };
 
   return (
     <View style={styles.container}>
-      <CameraView
-        ref={cameraRef}
+      <Camera
+        ref={camera}
         style={styles.camera}
-        facing={facing}
-        mode="video"
-        onCameraReady={onCameraReady}
-        onMountError={(error) => {
-          console.error('Camera mount error:', error);
-          setCameraStatus('mount-error');
-        }}
+        device={device}
+        isActive={true}
+        video={true}
+        audio={true}
         onError={(error) => {
-          console.error('Camera error:', error);
+          console.error('Camera error:', error.code, error.message);
           setCameraStatus('error');
         }}
-        videoStabilizationMode="auto"
-      >
-        <WireframeOverlay />
+        onInitialized={onCameraReady}
+        videoStabilizationMode="standard"
+      />
+      <View style={styles.controlsContainer}>
         {!recording && (
           <TouchableOpacity
             style={styles.flipButton}
@@ -321,7 +244,8 @@ export default function VideoRecorder({ onVideoUploaded }) {
             <View style={[styles.recordButtonInner, recording && styles.recordingButtonInner]} />
           </TouchableOpacity>
         </View>
-      </CameraView>
+      </View>
+      <WireframeOverlay />
       {uploading && (
         <View style={styles.uploadingOverlay}>
           <ActivityIndicator size="large" color="#fff" />
@@ -339,6 +263,19 @@ const styles = StyleSheet.create({
   },
   camera: {
     flex: 1,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
+  controlsContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 10,
   },
   buttonContainer: {
     position: 'absolute',
@@ -348,6 +285,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
+    zIndex: 2,
   },
   recordButton: {
     width: 80,
@@ -384,6 +322,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.3)',
     justifyContent: 'center',
     alignItems: 'center',
+    zIndex: 2,
   },
   uploadingOverlay: {
     ...StyleSheet.absoluteFillObject,
@@ -413,4 +352,3 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   }
 });
-
