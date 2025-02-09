@@ -4,7 +4,7 @@ module.exports = function(api) {
     presets: ['babel-preset-expo'],
     plugins: [
       ['react-native-reanimated/plugin', {
-        globals: ['__tfjs', '__poseDetection']
+        globals: ['__poseDetection']
       }],
       'react-native-worklets-core/plugin'
     ],
